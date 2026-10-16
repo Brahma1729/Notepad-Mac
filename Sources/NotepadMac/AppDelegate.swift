@@ -115,6 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         fileMenu.addItem(.separator())
         add(fileMenu, "Save", #selector(EditorWindowController.saveDocument(_:)), "s")
         add(fileMenu, "Save As...", #selector(EditorWindowController.saveDocumentAs(_:)), "S")
+        add(fileMenu, "Save All", #selector(EditorWindowController.saveAll(_:)), "")
 
         // --- Edit (NPP: Undo / Redo / Cut-Copy-Paste / Select All) ---
         let editItem = NSMenuItem(); mainMenu.addItem(editItem)
@@ -141,6 +142,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let wrap = NSMenuItem(title: "Word Wrap", action: #selector(EditorWindowController.toggleWordWrap(_:)), keyEquivalent: "")
         wrap.target = nil; wrap.state = .on
         viewMenu.addItem(wrap)
+        let ws = NSMenuItem(title: "Show Whitespace", action: #selector(EditorWindowController.toggleWhitespace(_:)), keyEquivalent: "")
+        ws.target = nil; ws.state = .on
+        viewMenu.addItem(ws)
+        let ig = NSMenuItem(title: "Indent Guides", action: #selector(EditorWindowController.toggleIndentGuides(_:)), keyEquivalent: "")
+        ig.target = nil; ig.state = .on
+        viewMenu.addItem(ig)
 
         // --- Language (NPP: Language menu — Core / Web groups) ---
         let langItem = NSMenuItem(); mainMenu.addItem(langItem)

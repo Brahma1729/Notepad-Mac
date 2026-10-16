@@ -83,6 +83,13 @@ struct SearchEngine {
         return all.count
     }
 
+    /// Count every occurrence in the whole document (NPP "Find All" count).
+    static func countAll(_ query: String, in text: NSString, options: FindOptions) throws -> Int {
+        guard !query.isEmpty else { return 0 }
+        let regex = try matches(query, options: options)
+        return regex.numberOfMatches(in: text as String, range: NSRange(location: 0, length: text.length))
+    }
+
     /// Replace one occurrence (the range found by `find`).
     static func replaceOne(_ query: String, replacement: String, in storage: NSTextStorage, options: FindOptions, at range: NSRange) throws {
         _ = try matches(query, options: options) // validate pattern

@@ -30,7 +30,7 @@ final class SearchPanel: NSPanel {
     // MARK: - UI construction (programmatic, no nib)
 
     private func buildUI() {
-        let content = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 132))
+        let content = NSView(frame: NSRect(x: 0, y: 0, width: 560, height: 132))
         contentView = content
 
         queryField.placeholderString = "Find what"
@@ -42,6 +42,8 @@ final class SearchPanel: NSPanel {
         findNextBtn.keyEquivalent = "\r" // Return anywhere in panel = next match
         let findPrevBtn = NSButton(title: "Find Prev", target: self, action: #selector(findPrevious))
         findPrevBtn.bezelStyle = .rounded
+        let findAllBtn = NSButton(title: "Find All", target: self, action: #selector(findAllAction))
+        findAllBtn.bezelStyle = .rounded
         let replaceOneBtn = NSButton(title: "Replace", target: self, action: #selector(replaceCurrent))
         replaceOneBtn.bezelStyle = .rounded
         let replaceAllBtn = NSButton(title: "Replace All", target: self, action: #selector(replaceAllAction))
@@ -50,7 +52,7 @@ final class SearchPanel: NSPanel {
         closeBtn.bezelStyle = .rounded
         closeBtn.keyEquivalent = "\u{1b}" // Escape
 
-        [findNextBtn, findPrevBtn, replaceOneBtn, replaceAllBtn, closeBtn].forEach {
+        [findNextBtn, findPrevBtn, findAllBtn, replaceOneBtn, replaceAllBtn, closeBtn].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false; content.addSubview($0)
         }
 
@@ -77,7 +79,8 @@ final class SearchPanel: NSPanel {
             queryField.trailingAnchor.constraint(equalTo: findNextBtn.leadingAnchor, constant: -8),
             queryField.topAnchor.constraint(equalTo: content.topAnchor, constant: 12),
             findNextBtn.trailingAnchor.constraint(equalTo: findPrevBtn.leadingAnchor, constant: -6),
-            findPrevBtn.trailingAnchor.constraint(equalTo: closeBtn.leadingAnchor, constant: -6),
+            findPrevBtn.trailingAnchor.constraint(equalTo: findAllBtn.leadingAnchor, constant: -6),
+            findAllBtn.trailingAnchor.constraint(equalTo: closeBtn.leadingAnchor, constant: -6),
             closeBtn.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -12),
             findNextBtn.centerYAnchor.constraint(equalTo: queryField.centerYAnchor),
             repLbl.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 12),
@@ -129,6 +132,17 @@ final class SearchPanel: NSPanel {
 
     @objc func findNext() { _ = perform(.forward) }
     @objc func findPrevious() { _ = perform(.backward) }
+
+    /// NPP "Find All": report how many occurrences exist in the whole document.
+    @objc func findAllAction() {
+        guard let tv = textView, !queryField.stringValue.isEmpty else { return }
+        do {
+            let n = try SearchEngine.countAll(queryField.stringValue, in: tv.string as NSString, options: options)
+            statusLabel.stringValue = "\(n) occurrence\(n == 1 ? "" : "s") found"
+        } catch {
+            statusLabel.stringValue = error.localizedDescription
+        }
+    }
 
     private func perform(_ direction: SearchEngine.Direction) -> Bool {
         guard let tv = textView, !queryField.stringValue.isEmpty else { return false }

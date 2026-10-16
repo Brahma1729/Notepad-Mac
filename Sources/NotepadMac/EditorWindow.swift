@@ -7,8 +7,9 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
     /// optional `document` property that a stored `let document` would clash with.
     let doc: EditorDocument
 
-    lazy var textView: NSTextView = makeTextView()
+    lazy var textView: NotepadTextView = makeTextView()
     private(set) var scrollView = NSScrollView(frame: .zero)
+    private let toolbar = ToolbarHeader(frame: .zero)
     private let statusBar = StatusBar(frame: .zero)
     private var highlightWork: DispatchWorkItem?
     private var wordWrapped = true
@@ -31,7 +32,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
 
     // MARK: - UI construction (programmatic, no nibs)
 
-    private func makeTextView() -> NSTextView {
+    private func makeTextView() -> NotepadTextView {
         let storage = NSTextStorage()
         let layoutManager = NSLayoutManager()
         storage.addLayoutManager(layoutManager)
@@ -42,7 +43,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
 
         let frame = NSRect(origin: .zero, size: scrollView.contentSize == .zero
                            ? NSSize(width: 1024, height: 768) : scrollView.contentSize)
-        let tv = NSTextView(frame: frame, textContainer: container)
+        let tv = NotepadTextView(frame: frame, textContainer: container)
         tv.minSize = NSSize(width: 0, height: 0)
         tv.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         tv.isVerticallyResizable = true
@@ -59,17 +60,26 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
         let contentBounds = NSRect(origin: .zero, size: window.contentMinSize == .zero
                                    ? NSSize(width: 1024, height: 768) : (window.contentView?.frame.size ?? NSSize(width: 1024, height: 768)))
         let sbHeight: CGFloat = 20
+        let tbHeight: CGFloat = toolbar.preferredHeight
 
-        scrollView.frame = NSRect(x: 0, y: sbHeight, width: contentBounds.width, height: max(contentBounds.height - sbHeight, 1))
+        scrollView.frame = NSRect(x: 0, y: sbHeight + tbHeight, width: contentBounds.width,
+                                  height: max(contentBounds.height - sbHeight - tbHeight, 1))
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
         scrollView.documentView = textView
+        scrollView.autoresizingMask = [.width, .height]
+
+        toolbar.frame = NSRect(x: 0, y: contentBounds.height - tbHeight, width: contentBounds.width, height: tbHeight)
+        toolbar.autoresizingMask = [.width]
+        wireToolbar()
+        toolbar.syncToggles(wordWrap: wordWrapped, whitespace: textView.showWhitespace, indentGuides: textView.showIndentGuides)
 
         statusBar.frame = NSRect(x: 0, y: 0, width: contentBounds.width, height: sbHeight)
         statusBar.autoresizingMask = [.width]
 
         let container = NSView(frame: window.contentView!.bounds)
+        container.addSubview(toolbar)
         container.addSubview(scrollView)
         container.addSubview(statusBar)
         window.contentView = container
@@ -195,7 +205,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
         }
     }
 
-    private func writeAndSave() throws {
+    func writeAndSave() throws {   // internal so `saveAll` can reach other windows
         guard let url = doc.fileURL else { saveDocumentAs(nil); return }
         try writeAndSave(to: url)
     }
@@ -228,13 +238,68 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
 
     // MARK: - Word wrap (NPP View menu)
 
-    @objc func toggleWordWrap(_ sender: NSMenuItem) {
+    @objc func toggleWordWrap(_ sender: Any? = nil) {
         wordWrapped.toggle()
-        sender.state = wordWrapped ? .on : .off
         textView.isHorizontallyResizable = !wordWrapped
         textView.maxSize = NSSize(width: wordWrapped ? CGFloat.greatestFiniteMagnitude : 1_000_000,
                                   height: CGFloat.greatestFiniteMagnitude)
         scrollView.hasHorizontalScroller = !wordWrapped
+        if let item = sender as? NSMenuItem { item.state = wordWrapped ? .on : .off } else { syncWordWrapMenuItem() }
+        toolbar.syncToggles(wordWrap: wordWrapped, whitespace: textView.showWhitespace, indentGuides: textView.showIndentGuides)
+    }
+
+    /// Keeps the View ▸ Word Wrap checkmark in sync when toggled from the toolbar.
+    private func syncWordWrapMenuItem() {
+        let wanted = wordWrapped ? NSControl.StateValue.on : .off
+        for top in (NSApp.mainMenu?.items ?? []) {
+            guard let sub = top.submenu else { continue }
+            if let item = sub.items.first(where: { $0.action == #selector(toggleWordWrap(_:)) }) {
+                item.state = wanted; return
+            }
+        }
+    }
+
+    // MARK: - Toolbar actions (NPP-style quick buttons)
+
+    /// NPP "Save All": writes every dirty document, keeping each one's own encoding/EOL.
+    @objc func saveAll(_ sender: Any?) {
+        for controller in NSApp.windows.compactMap({ $0.windowController as? EditorWindowController }) where controller.doc.isDirty {
+            do { try controller.writeAndSave() } catch { NSSound.beep() }
+        }
+    }
+
+    @objc func zoomIn(_ sender: Any?)  { setFontPoint((textView.font?.pointSize ?? 13) + 1) }
+    @objc func zoomOut(_ sender: Any?) { setFontPoint((textView.font?.pointSize ?? 13) - 1) }
+    @objc func resetFontSize(_ sender: Any?) { setFontPoint(13) }
+
+    private func setFontPoint(_ raw: CGFloat) {
+        let size = min(max(raw, 8), 48)
+        guard let storage = textView.textStorage else { return }
+        storage.beginEditing()
+        storage.addAttribute(.font, value: NSFont.userFixedPitchFont(ofSize: size) ?? NSFont.systemFont(ofSize: size), range: NSRange(location: 0, length: storage.length))
+        storage.endEditing()
+    }
+
+    @objc func toggleWhitespace(_ sender: Any?) {
+        textView.showWhitespace.toggle()
+        toolbar.syncToggles(wordWrap: wordWrapped, whitespace: textView.showWhitespace, indentGuides: textView.showIndentGuides)
+    }
+
+    @objc func toggleIndentGuides(_ sender: Any?) {
+        textView.showIndentGuides.toggle()
+        toolbar.syncToggles(wordWrap: wordWrapped, whitespace: textView.showWhitespace, indentGuides: textView.showIndentGuides)
+    }
+
+    private func wireToolbar() {
+        toolbar.onNew = { NSApp.sendAction(#selector(AppDelegate.newDocument(_:)), to: nil, from: nil) }
+        toolbar.onOpen = { NSApp.sendAction(#selector(AppDelegate.openDocument(_:)), to: nil, from: nil) }
+        toolbar.onSaveAll = { [weak self] in self?.saveAll(nil) }
+        toolbar.onZoomIn = { [weak self] in self?.zoomIn(nil) }
+        toolbar.onZoomOut = { [weak self] in self?.zoomOut(nil) }
+        toolbar.onResetFont = { [weak self] in self?.resetFontSize(nil) }
+        toolbar.onToggleWordWrap = { [weak self] _ in self?.toggleWordWrap() }
+        toolbar.onToggleWhitespace = { [weak self] _ in self?.toggleWhitespace(nil) }
+        toolbar.onToggleIndentGuides = { [weak self] _ in self?.toggleIndentGuides(nil) }
     }
 
     // MARK: - Close (NPP: prompt to save when dirty)
