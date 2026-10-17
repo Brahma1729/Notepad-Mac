@@ -11,6 +11,26 @@ final class SearchPanel: NSPanel {
     private let regexCheckbox = NSButton(checkboxWithTitle: "Regex", target: nil, action: nil)
     private var statusLabel: NSTextField!
 
+    // MARK: Find All results list (NPP "Find all" — click a row to jump there)
+    private let resultsTable = NSTableView()
+    private lazy var resultsScroll: NSScrollView = {
+        let s = NSScrollView()
+        s.documentView = resultsTable
+        s.hasVerticalScroller = true
+        s.autohidesScrollers = true
+        s.borderType = .bezelBorder
+        s.translatesAutoresizingMaskIntoConstraints = false
+        return s
+    }()
+    private var resultsHeightConstraint: NSLayoutConstraint!
+    private var matches: [SearchEngine.Match] = []
+    private var rowTexts: [String] = []
+    private let maxListedMatches = 500
+
+    /// Extra panel height while the results list is expanded. Top edge stays fixed; we grow downward.
+    private let resultsExtraHeight: CGFloat = 216
+    private var expandedDelta: CGFloat = 0
+
     weak var textView: NSTextView?
     weak var document: EditorDocument?
 
@@ -97,6 +117,49 @@ final class SearchPanel: NSPanel {
             statusLabel.trailingAnchor.constraint(equalTo: closeBtn.trailingAnchor),
             statusLabel.centerYAnchor.constraint(equalTo: optionsStack.centerYAnchor)
         ])
+
+        // Find All results list — hidden (zero height) until "Find All" produces matches.
+        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("match"))
+        column.title = "Match"
+        column.width = 420
+        resultsTable.addTableColumn(column)
+        resultsTable.headerView = nil          // NPP's list has no header
+        resultsTable.rowSizeStyle = .default
+        resultsTable.usesAutomaticRowHeights = false
+        resultsTable.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
+        resultsTable.allowsMultipleSelection = false
+        resultsTable.delegate = self   // row click → jump to occurrence (see extension below)
+        resultsScroll.isHidden = true
+        content.addSubview(resultsScroll)
+
+        resultsHeightConstraint = resultsScroll.heightAnchor.constraint(equalToConstant: 0)
+        NSLayoutConstraint.activate([
+            resultsScroll.leadingAnchor.constraint(equalTo: findLbl.leadingAnchor),
+            resultsScroll.trailingAnchor.constraint(equalTo: closeBtn.trailingAnchor),
+            resultsScroll.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 8),
+            resultsHeightConstraint
+        ])
+    }
+
+    /// Grow/shrink the panel for the results list, keeping its top edge fixed (like NPP).
+    private func setResultsExpanded(_ expand: Bool) {
+        let delta: CGFloat = expand ? resultsExtraHeight : 0
+        guard delta != expandedDelta else { return }
+        var f = frame
+        let d = delta - expandedDelta
+        f.size.height += d
+        f.origin.y -= d          // keep top edge fixed; grow downward
+        expandedDelta = delta
+        setFrame(f, display: true)
+        resultsHeightConstraint.constant = delta
+        resultsScroll.isHidden = !expand
+    }
+
+    private func clearResults() {
+        matches.removeAll()
+        rowTexts.removeAll()
+        resultsTable.reloadData()
+        setResultsExpanded(false)
     }
 
     // MARK: - lifecycle
@@ -105,6 +168,7 @@ final class SearchPanel: NSPanel {
         self.textView = textView
         self.document = document
         statusLabel.stringValue = ""
+        clearResults()
         if let window = textView.window {
             setFrameOrigin(NSPoint(x: window.frame.minX + 60, y: window.frame.maxY - 170))
         }
@@ -133,15 +197,34 @@ final class SearchPanel: NSPanel {
     @objc func findNext() { _ = perform(.forward) }
     @objc func findPrevious() { _ = perform(.backward) }
 
-    /// NPP "Find All": report how many occurrences exist in the whole document.
+    /// NPP "Find All": list every occurrence with its line number; click a row to jump there.
     @objc func findAllAction() {
         guard let tv = textView, !queryField.stringValue.isEmpty else { return }
         do {
-            let n = try SearchEngine.countAll(queryField.stringValue, in: tv.string as NSString, options: options)
-            statusLabel.stringValue = "\(n) occurrence\(n == 1 ? "" : "s") found"
+            let all = try SearchEngine.findAll(queryField.stringValue, in: tv.string as NSString, options: options)
+            matches = Array(all.prefix(maxListedMatches))
+            rowTexts = matches.map { "L\($0.line): \(Self.lineSnippet(for: $0.range, in: tv.string as NSString))" }
+            resultsTable.reloadData()
+            setResultsExpanded(true)
+            statusLabel.stringValue = all.count > maxListedMatches
+                ? "\(all.count) occurrences found (showing first \(maxListedMatches))"
+                : "\(all.count) occurrence\(all.count == 1 ? "" : "s") found"
         } catch {
             statusLabel.stringValue = error.localizedDescription
         }
+    }
+
+    /// Trimmed line of text containing the match, truncated to keep rows readable (NPP-style).
+    private static func lineSnippet(for range: NSRange, in text: NSString) -> String {
+        let n = text.length
+        guard n > 0 else { return "" }
+        var start = min(max(range.location, 0), n - 1)
+        while start > 0 && text.character(at: start - 1) != 10 { start -= 1 }
+        var end = min(NSMaxRange(range), n)
+        while end < n && text.character(at: end) != 10 { end += 1 }
+        let s = text.substring(with: NSRange(location: start, length: end - start))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return s.count > 64 ? String(s.prefix(61)) + "..." : s
     }
 
     private func perform(_ direction: SearchEngine.Direction) -> Bool {
@@ -169,6 +252,7 @@ final class SearchPanel: NSPanel {
         do {
             try SearchEngine.replaceOne(queryField.stringValue, replacement: replaceField.stringValue, in: tv.textStorage!, options: options, at: tv.selectedRange())
             document?.markDirty()
+            clearResults()   // stored ranges are now stale after the edit
             _ = perform(.forward) // continue searching after replace (NPP behavior)
         } catch { statusLabel.stringValue = error.localizedDescription; NSSound.beep() }
     }
@@ -178,9 +262,32 @@ final class SearchPanel: NSPanel {
         do {
             let count = try SearchEngine.replaceAll(queryField.stringValue, replacement: replaceField.stringValue, in: tv.textStorage!, options: options)
             document?.markDirty()
+            clearResults()   // stored ranges are now stale after the edit
             statusLabel.stringValue = "Replaced \(count) occurrence(s)"
         } catch { statusLabel.stringValue = error.localizedDescription; NSSound.beep() }
     }
 
     @objc func closePanel() { orderOut(nil) }
+}
+
+// MARK: - Find All results list (NPP-style table)
+
+extension SearchPanel: NSTableViewDataSource, NSTableViewDelegate {
+    func numberOfRows(in tableView: NSTableView) -> Int { rowTexts.count }
+
+    func tableView(_ tableView: NSTableView, objectValueFor tableColumn: NSTableColumn?, row: Int) -> Any? {
+        guard row >= 0, row < rowTexts.count else { return nil }
+        return rowTexts[row]
+    }
+
+    /// Clicking a result row jumps the editor to that occurrence (NPP behavior).
+    func tableViewSelectionDidChange(_ notification: Notification) {
+        let row = resultsTable.selectedRow
+        guard row >= 0, row < matches.count, let tv = textView else { return }
+        let range = matches[row].range
+        guard range.location <= tv.string.utf16.count else { return }   // text changed since the search
+        tv.setSelectedRange(range)
+        tv.scrollRangeToVisible(range)
+        statusLabel.stringValue = "Line \(matches[row].line)"
+    }
 }

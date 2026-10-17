@@ -90,6 +90,33 @@ struct SearchEngine {
         return regex.numberOfMatches(in: text as String, range: NSRange(location: 0, length: text.length))
     }
 
+    /// One occurrence found by Find All (NPP lists these with their line numbers).
+    struct Match {
+        let range: NSRange
+        let line: Int   // 1-based, like NPP's results list
+    }
+
+    /// Every occurrence in document order. Line numbers are computed lazily per match.
+    static func findAll(_ query: String, in text: NSString, options: FindOptions) throws -> [Match] {
+        guard !query.isEmpty else { return [] }
+        let regex = try matches(query, options: options)
+        let all = regex.matches(in: text as String, range: NSRange(location: 0, length: text.length))
+        var result: [Match] = []
+        result.reserveCapacity(all.count)
+        for m in all {
+            result.append(Match(range: m.range, line: lineNumber(of: m.range.location, in: text)))
+        }
+        return result
+    }
+
+    /// 1-based line number containing a UTF-16 offset.
+    private static func lineNumber(of loc: Int, in text: NSString) -> Int {
+        guard loc > 0 else { return 1 }
+        var line = 1
+        for ch in text.substring(to: loc) where ch == "\n" { line += 1 }
+        return line
+    }
+
     /// Replace one occurrence (the range found by `find`).
     static func replaceOne(_ query: String, replacement: String, in storage: NSTextStorage, options: FindOptions, at range: NSRange) throws {
         _ = try matches(query, options: options) // validate pattern
