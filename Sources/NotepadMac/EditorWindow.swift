@@ -10,6 +10,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
     lazy var textView: NotepadTextView = makeTextView()
     private(set) var scrollView = NSScrollView(frame: .zero)
     private let toolbar = ToolbarHeader(frame: .zero)
+    private let menuBar = MenuHeader()
     private let statusBar = StatusBar(frame: .zero)
     private var highlightWork: DispatchWorkItem?
     private var wordWrapped = true
@@ -60,17 +61,23 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
         let contentBounds = NSRect(origin: .zero, size: window.contentMinSize == .zero
                                    ? NSSize(width: 1024, height: 768) : (window.contentView?.frame.size ?? NSSize(width: 1024, height: 768)))
         let sbHeight: CGFloat = 20
+        let mbHeight: CGFloat = MenuHeader.height
         let tbHeight: CGFloat = toolbar.preferredHeight
 
-        scrollView.frame = NSRect(x: 0, y: sbHeight + tbHeight, width: contentBounds.width,
-                                  height: max(contentBounds.height - sbHeight - tbHeight, 1))
+        // In-window NPP-style menu strip along the top of the window.
+        menuBar.frame = NSRect(x: 0, y: contentBounds.height - mbHeight, width: contentBounds.width, height: mbHeight)
+        menuBar.autoresizingMask = [.width]
+        menuBar.syncViewStates(wordWrap: wordWrapped, whitespace: textView.showWhitespace, indentGuides: textView.showIndentGuides)
+
+        scrollView.frame = NSRect(x: 0, y: sbHeight + tbHeight + mbHeight, width: contentBounds.width,
+                                  height: max(contentBounds.height - sbHeight - tbHeight - mbHeight, 1))
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
         scrollView.documentView = textView
         scrollView.autoresizingMask = [.width, .height]
 
-        toolbar.frame = NSRect(x: 0, y: contentBounds.height - tbHeight, width: contentBounds.width, height: tbHeight)
+        toolbar.frame = NSRect(x: 0, y: contentBounds.height - mbHeight - tbHeight, width: contentBounds.width, height: tbHeight)
         toolbar.autoresizingMask = [.width]
         wireToolbar()
         toolbar.syncToggles(wordWrap: wordWrapped, whitespace: textView.showWhitespace, indentGuides: textView.showIndentGuides)
@@ -79,6 +86,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
         statusBar.autoresizingMask = [.width]
 
         let container = NSView(frame: window.contentView!.bounds)
+        container.addSubview(menuBar)
         container.addSubview(toolbar)
         container.addSubview(scrollView)
         container.addSubview(statusBar)
@@ -246,6 +254,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
         scrollView.hasHorizontalScroller = !wordWrapped
         if let item = sender as? NSMenuItem { item.state = wordWrapped ? .on : .off } else { syncWordWrapMenuItem() }
         toolbar.syncToggles(wordWrap: wordWrapped, whitespace: textView.showWhitespace, indentGuides: textView.showIndentGuides)
+        menuBar.syncViewStates(wordWrap: wordWrapped, whitespace: textView.showWhitespace, indentGuides: textView.showIndentGuides)
     }
 
     /// Keeps the View ▸ Word Wrap checkmark in sync when toggled from the toolbar.
@@ -283,11 +292,13 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
     @objc func toggleWhitespace(_ sender: Any?) {
         textView.showWhitespace.toggle()
         toolbar.syncToggles(wordWrap: wordWrapped, whitespace: textView.showWhitespace, indentGuides: textView.showIndentGuides)
+        menuBar.syncViewStates(wordWrap: wordWrapped, whitespace: textView.showWhitespace, indentGuides: textView.showIndentGuides)
     }
 
     @objc func toggleIndentGuides(_ sender: Any?) {
         textView.showIndentGuides.toggle()
         toolbar.syncToggles(wordWrap: wordWrapped, whitespace: textView.showWhitespace, indentGuides: textView.showIndentGuides)
+        menuBar.syncViewStates(wordWrap: wordWrapped, whitespace: textView.showWhitespace, indentGuides: textView.showIndentGuides)
     }
 
     private func wireToolbar() {
