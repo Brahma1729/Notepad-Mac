@@ -69,6 +69,7 @@ final class MenuHeader: NSView {
 
             buttons.append(button)
             menus[spec.title] = spec.menu
+            spec.menu.delegate = self   // menuDidClose clears the button highlight
         }
     }
 
@@ -78,9 +79,11 @@ final class MenuHeader: NSView {
         // Button titles are decorated (" File ▾") — match by prefix of the menu name.
         let label = sender.title.trimmingCharacters(in: .whitespaces)
         guard let menu = menus.first(where: { label.hasPrefix($0.key) })?.value else { return }
-        // AppKit coordinate system is bottom-up: just below the button's frame.
-        let point = NSPoint(x: sender.frame.minX, y: -sender.frame.maxY - 2)
-        menu.popUp(positioning: nil, at: point, in: self)
+        // The button lives inside a padded NSStackView — convert its bounds into this strip's
+        // coordinate space (bottom-up), then anchor the menu just below it.
+        let rect = sender.convert(sender.bounds, to: self)
+        menu.popUp(positioning: nil, at: NSPoint(x: rect.minX, y: rect.minY - 2), in: self)
+        sender.state = .on   // stays highlighted while the menu is open; menuDidClose resets it
     }
 
     /// Syncs checkmarks for the View toggles (called when state changes elsewhere).
@@ -115,6 +118,9 @@ final class MenuHeader: NSView {
         menu.addItem(makeItem("New…", #selector(AppDelegate.newDocument(_:)), "n"))
         menu.addItem(makeItem("Open…", #selector(AppDelegate.openDocument(_:)), "o"))
         menu.addItem(.separator())
+        // Same items/shortcuts as the app's File menu (routed via the responder chain).
+        menu.addItem(makeItem("Save", #selector(EditorWindowController.saveDocument(_:)), "s"))
+        menu.addItem(makeItem("Save As...", #selector(EditorWindowController.saveDocumentAs(_:)), "S"))
         // The controller owns its own dirty-check flow (closeDocument), so use
         // that instead of performClose: to keep the save prompt consistent.
         menu.addItem(makeItem("Close Document", #selector(EditorWindowController.closeDocument(_:)), "w"))
@@ -180,12 +186,20 @@ final class MenuHeader: NSView {
     private func encodingMenu() -> NSMenu {
         let menu = NSMenu(title: "Encoding")
         // Same list as the app's Status menu; names map to EditorDocument.encoding.
-        for encName in ["UTF-8", "UTF-16 LE", "ANSI"] {
+        for encName in ["UTF-8", "UTF-8-BOM", "UTF-16 LE", "UTF-16 BE", "ANSI"] {
             let item = makeItem(encName, #selector(EditorWindowController.selectEncoding(_:)))
             item.representedObject = encName
             menu.addItem(item)
         }
         return menu
+    }
+
+    /// Marks the active encoding (menu-item name) with a checkmark.
+    func markEncoding(_ name: String) {
+        guard let menu = menus["Encoding"] else { return }
+        for item in menu.items where item.representedObject is String {
+            item.state = (item.representedObject as? String == name) ? .on : .off
+        }
     }
 
     private func windowMenu() -> NSMenu {
@@ -194,5 +208,13 @@ final class MenuHeader: NSView {
         menu.addItem(.separator())
         menu.addItem(makeItem("Close All", #selector(EditorWindowController.closeAllDocuments(_:))))
         return menu
+    }
+}
+
+// MARK: - NSMenuDelegate (reset button highlight when a menu dismisses)
+
+extension MenuHeader: NSMenuDelegate {
+    func menuDidClose(_ menu: NSMenu) {
+        buttons.forEach { $0.state = .off }
     }
 }

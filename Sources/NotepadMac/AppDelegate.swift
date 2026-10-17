@@ -179,7 +179,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let statusItem = NSMenuItem(); mainMenu.addItem(statusItem)
         let statusMenu = NSMenu(title: "Status"); statusItem.submenu = statusMenu
         langMenu.title = "Language"   // keep group title in sync (no-op guard)
-        for encName in ["UTF-8", "UTF-16 LE", "ANSI"] {
+        for encName in ["UTF-8", "UTF-8-BOM", "UTF-16 LE", "UTF-16 BE", "ANSI"] {
             add(statusMenu, encName, #selector(EditorWindowController.selectEncoding(_:)), "", representedObject: encName)
         }
     }

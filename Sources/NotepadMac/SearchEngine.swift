@@ -110,11 +110,49 @@ struct SearchEngine {
     }
 
     /// 1-based line number containing a UTF-16 offset.
+    /// EOL-aware like NPP: `\r\n` counts as one break; lone `\n` and lone `\r` count too.
     private static func lineNumber(of loc: Int, in text: NSString) -> Int {
         guard loc > 0 else { return 1 }
         var line = 1
-        for ch in text.substring(to: loc) where ch == "\n" { line += 1 }
+        let n = min(loc, text.length)
+        var i = 0
+        while i < n {
+            let ch = text.character(at: i)
+            if ch == 0x0D || ch == 0x0A {                       // \r or \n
+                line += 1
+                if ch == 0x0D && i + 1 < n, text.character(at: i + 1) == 0x0A { i += 2 } else { i += 1 }
+            } else {
+                i += 1
+            }
+        }
         return line
+    }
+
+    /// NPP-style preview for the results list: the match's line with a context window
+    /// around it, elided (`…`) on either side when the line is long. EOL-aware.
+    static func contextSnippet(for range: NSRange, in text: NSString) -> String {
+        let n = text.length
+        guard n > 0 else { return "" }
+        func isEOL(_ i: Int) -> Bool {
+            guard i >= 0 && i < n else { return false }
+            let c = text.character(at: i)
+            return c == 0x0D || c == 0x0A
+        }
+
+        // Boundaries of the line containing the match.
+        var start = min(max(range.location, 0), n - 1)
+        while start > 0 && !isEOL(start - 1) { start -= 1 }
+        var end = min(NSMaxRange(range), n)
+        while end < n && !isEOL(end) { end += 1 }
+
+        let half: Int = 40   // context characters on each side of the match (UTF-16 units ≈ chars for ASCII)
+        let lo = max(start, range.location - half)
+        let hi = min(end, NSMaxRange(range) + half)
+        var snippet = text.substring(with: NSRange(location: lo, length: hi - lo))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if lo > start { snippet = "…" + snippet }
+        if hi < end { snippet = snippet + "…" }
+        return snippet
     }
 
     /// Replace one occurrence (the range found by `find`).

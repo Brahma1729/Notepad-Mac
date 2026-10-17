@@ -58,39 +58,45 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
 
     private func buildContent() {
         guard let window = window else { return }
-        let contentBounds = NSRect(origin: .zero, size: window.contentMinSize == .zero
-                                   ? NSSize(width: 1024, height: 768) : (window.contentView?.frame.size ?? NSSize(width: 1024, height: 768)))
-        let sbHeight: CGFloat = 20
-        let mbHeight: CGFloat = MenuHeader.height
-        let tbHeight: CGFloat = toolbar.preferredHeight
+        let container = NSView(frame: window.contentView?.bounds ?? .zero)
+        window.contentView = container
 
-        // In-window NPP-style menu strip along the top of the window.
-        menuBar.frame = NSRect(x: 0, y: contentBounds.height - mbHeight, width: contentBounds.width, height: mbHeight)
-        menuBar.autoresizingMask = [.width]
         menuBar.syncViewStates(wordWrap: wordWrapped, whitespace: textView.showWhitespace, indentGuides: textView.showIndentGuides)
-
-        scrollView.frame = NSRect(x: 0, y: sbHeight + tbHeight + mbHeight, width: contentBounds.width,
-                                  height: max(contentBounds.height - sbHeight - tbHeight - mbHeight, 1))
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
         scrollView.documentView = textView
-        scrollView.autoresizingMask = [.width, .height]
 
-        toolbar.frame = NSRect(x: 0, y: contentBounds.height - mbHeight - tbHeight, width: contentBounds.width, height: tbHeight)
-        toolbar.autoresizingMask = [.width]
         wireToolbar()
         toolbar.syncToggles(wordWrap: wordWrapped, whitespace: textView.showWhitespace, indentGuides: textView.showIndentGuides)
 
-        statusBar.frame = NSRect(x: 0, y: 0, width: contentBounds.width, height: sbHeight)
-        statusBar.autoresizingMask = [.width]
+        // Auto Layout (the old frame-based layout let the editor overlap the menu/toolbar).
+        for v in [menuBar, toolbar, scrollView, statusBar] {
+            v.translatesAutoresizingMaskIntoConstraints = false
+            container.addSubview(v)
+        }
+        NSLayoutConstraint.activate([
+            menuBar.topAnchor.constraint(equalTo: container.topAnchor),
+            menuBar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            menuBar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            menuBar.heightAnchor.constraint(equalToConstant: MenuHeader.height),
 
-        let container = NSView(frame: window.contentView!.bounds)
-        container.addSubview(menuBar)
-        container.addSubview(toolbar)
-        container.addSubview(scrollView)
-        container.addSubview(statusBar)
-        window.contentView = container
+            toolbar.topAnchor.constraint(equalTo: menuBar.bottomAnchor),
+            toolbar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            toolbar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            toolbar.heightAnchor.constraint(equalToConstant: toolbar.preferredHeight),
+
+            scrollView.topAnchor.constraint(equalTo: toolbar.bottomAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: statusBar.topAnchor),
+
+            statusBar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            statusBar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            statusBar.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            statusBar.heightAnchor.constraint(equalToConstant: StatusBar.height)
+        ])
+        markEncodingCheckmarks(encodingMenuName)   // initial checkmark in both menus
     }
 
     // MARK: - Document sync + highlighting
@@ -110,6 +116,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
         refreshTitle()
         scheduleHighlight()
         refreshCaretStatus()
+        SearchPanel.shared.invalidateResults()   // any edit invalidates stored Find All ranges
     }
 
     private func scheduleHighlight() {
@@ -242,6 +249,29 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
         default: doc.encoding = .ansi
         }
         updateStatusBarMeta()
+        markEncodingCheckmarks(name)   // checkmark follows the active encoding (NPP behavior)
+    }
+
+    /// Menu-item name for the current document encoding (`NPPEncoding.rawValue` is "ANSI (Latin-1)", but menus say "ANSI").
+    private var encodingMenuName: String {
+        switch doc.encoding {
+        case .utf8: return "UTF-8"
+        case .utf8BOM: return "UTF-8-BOM"
+        case .utf16le: return "UTF-16 LE"
+        case .utf16be: return "UTF-16 BE"
+        case .ansi: return "ANSI"
+        }
+    }
+
+    /// Checkmarks the active encoding in both menus (in-window Encoding menu + app Status menu).
+    private func markEncodingCheckmarks(_ name: String) {
+        menuBar.markEncoding(name)
+        for item in NSApp.mainMenu?.items ?? [] {
+            guard let sub = item.submenu else { continue }
+            for encItem in sub.items where (encItem.representedObject as? String).map({ $0.hasPrefix("UTF") || $0 == "ANSI" }) == true {
+                encItem.state = (encItem.title == name) ? .on : .off
+            }
+        }
     }
 
     // MARK: - Word wrap (NPP View menu)

@@ -55,8 +55,16 @@ PLIST
 # PkgInfo — standard bundle signature.
 printf 'APPL????' > "$CONTENTS/PkgInfo"
 
+# Strip Finder detritus (.DS_Store, extended attributes) — codesign rejects them.
+find "$BUILD_DIR/$BUNDLE" -name ".DS_Store" -delete 2>/dev/null || true
+find "$BUILD_DIR/$BUNDLE" -depth -print0 | xargs -0 xattr -c 2>/dev/null || true
+
 echo "==> Ad-hoc code signing..."
-codesign --force --sign - "$BUILD_DIR/$BUNDLE" 2>/dev/null || echo "(codesign skipped)"
+if codesign --force --sign - "$BUILD_DIR/$BUNDLE"; then
+    echo "(signature applied)"
+else
+    echo "WARNING: codesign failed — the app still works locally" >&2
+fi
 
 echo ""
 echo "✅ Done: $BUILD_DIR/$BUNDLE"
