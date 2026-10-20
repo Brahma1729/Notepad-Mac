@@ -66,6 +66,9 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
         scrollView.documentView = textView
+        scrollView.verticalRulerView = LineNumberRuler(scrollView: scrollView, textView: textView)
+        scrollView.hasVerticalRuler = true
+        scrollView.rulersVisible = true
 
         wireToolbar()
         toolbar.syncToggles(wordWrap: wordWrapped, whitespace: textView.showWhitespace, indentGuides: textView.showIndentGuides)

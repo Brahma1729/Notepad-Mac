@@ -127,6 +127,8 @@ final class SearchPanel: NSPanel {
         resultsTable.usesAutomaticRowHeights = false
         resultsTable.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
         resultsTable.allowsMultipleSelection = false
+        resultsTable.target = self
+        resultsTable.doubleAction = #selector(selectResultLine)
         resultsTable.delegate = self
         resultsTable.dataSource = self      // required — table is view-based and row-backed; without it the list renders empty
         // Row click → jump to occurrence (delegate, extension below)
@@ -297,6 +299,20 @@ extension SearchPanel: NSTableViewDataSource, NSTableViewDelegate {
     func tableView(_ tableView: NSTableView, objectValueFor tableColumn: NSTableColumn?, row: Int) -> Any? {
         guard row >= 0, row < rowTexts.count else { return nil }
         return rowTexts[row]
+    }
+
+    @objc private func selectResultLine() {
+        guard let tv = textView else { return }
+        let row = resultsTable.clickedRow
+        guard row >= 0, row < matches.count else { return }
+        let text = tv.string as NSString
+        let match = matches[row].range
+        guard NSMaxRange(match) <= text.length else { return }
+        let line = text.lineRange(for: match)
+        tv.setSelectedRange(line)
+        tv.scrollRangeToVisible(line)
+        tv.window?.makeKeyAndOrderFront(nil)
+        tv.window?.makeFirstResponder(tv)
     }
 
     /// Clicking a result row jumps the editor to that occurrence (NPP behavior).
