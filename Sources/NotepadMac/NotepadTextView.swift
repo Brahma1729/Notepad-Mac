@@ -37,7 +37,7 @@ final class NotepadTextView: NSTextView {
                     indent += 1
                 }
                 if indent > 0 {
-                    let guideColor = NSColor.gridColor.withAlphaComponent(0.5)
+                    let guideColor = NSColor.secondaryLabelColor.withAlphaComponent(0.4)   // gridColor is near-invisible on windowBackground
                     for i in 1...indent {
                         let x = origin.x + fragRect.minX + CGFloat(i) * spaceWidth
                         guideColor.setFill()

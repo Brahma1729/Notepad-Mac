@@ -18,56 +18,94 @@ final class ToolbarHeader: NSView {
     private(set) var whitespaceBtn = NSButton(title: "WS", target: nil, action: nil)
     private(set) var indentGuidesBtn = NSButton(title: "IG", target: nil, action: nil)
 
-    /// gap-before each button (extra space marks group separators).
-    private var layoutSpecs: [(NSButton, CGFloat)] = []
-    private var actions = [ObjectIdentifier: () -> Void]()
+    private var buttons: [NSButton] = []
+    private var handlers: [() -> Void] = []
+    private var toggleIndices = Set<Int>()
+    private let stack = NSStackView()
+    private let more = NSButton(title: "More", target: nil, action: nil)
+    private var visibleCount = 0
+    private let buttonWidth: CGFloat = 28
+    private let gap: CGFloat = 4
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        wantsLayer = true
-        layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
-        buildButtons()
+        stack.orientation = .horizontal
+        stack.alignment = .centerY
+        stack.spacing = gap
+        stack.detachesHiddenViews = true
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -6),
+            stack.centerYAnchor.constraint(equalTo: centerYAnchor)
+        ])
+        add("New", "doc.badge.plus") { [weak self] in self?.onNew?() }
+        add("Open", "folder") { [weak self] in self?.onOpen?() }
+        add("Save All", "square.and.arrow.down") { [weak self] in self?.onSaveAll?() }
+        add("Zoom In", "plus.magnifyingglass") { [weak self] in self?.onZoomIn?() }
+        add("Zoom Out", "minus.magnifyingglass") { [weak self] in self?.onZoomOut?() }
+        add("Reset Font Size", "textformat.size") { [weak self] in self?.onResetFont?() }
+        add("Word Wrap", "return", button: wordWrapBtn) { [weak self] in
+            guard let self = self else { return }; self.fireToggle(self.wordWrapBtn)
+        }
+        add("Show Whitespace", "paragraphsign", button: whitespaceBtn) { [weak self] in
+            guard let self = self else { return }; self.fireToggle(self.whitespaceBtn)
+        }
+        add("Indent Guides", "line.3.horizontal.decrease", button: indentGuidesBtn) { [weak self] in
+            guard let self = self else { return }; self.fireToggle(self.indentGuidesBtn)
+        }
+        more.target = self
+        more.action = #selector(showMore(_:))
+        more.bezelStyle = .rounded
+        more.toolTip = "More actions"
+        more.setAccessibilityLabel("More actions")
+        more.translatesAutoresizingMaskIntoConstraints = false
+        stack.addArrangedSubview(more)
+        more.widthAnchor.constraint(equalToConstant: 56).isActive = true
+        more.heightAnchor.constraint(equalToConstant: 26).isActive = true
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
-    private func add(_ btn: NSButton, gap: CGFloat, _ handler: @escaping () -> Void) {
+    private func add(_ title: String, _ symbol: String, button: NSButton? = nil,
+                     handler: @escaping () -> Void) {
+        let btn = button ?? NSButton()
+        btn.title = ""
+        btn.image = NSImage(systemSymbolName: symbol, accessibilityDescription: title)
+        if btn.image == nil { btn.title = title }
+        btn.imagePosition = .imageOnly
+        btn.toolTip = title
+        btn.setAccessibilityLabel(title)
         btn.bezelStyle = .rounded
-        actions[ObjectIdentifier(btn)] = handler
-        layoutSpecs.append((btn, gap))
+        btn.tag = buttons.count
+        btn.target = self
+        btn.action = #selector(tapped(_:))
+        if button != nil { toggleIndices.insert(btn.tag) }
+        buttons.append(btn)
+        handlers.append(handler)
+        btn.translatesAutoresizingMaskIntoConstraints = false
+        stack.addArrangedSubview(btn)
+        btn.widthAnchor.constraint(equalToConstant: buttonWidth).isActive = true
+        btn.heightAnchor.constraint(equalToConstant: 26).isActive = true
     }
 
-    private func buildButtons() {
-        let newBtn = NSButton(title: "New", target: nil, action: nil)
-        let openBtn = NSButton(title: "Open", target: nil, action: nil)
-        let saveAllBtn = NSButton(title: "Save All", target: nil, action: nil)
-        let zoomInBtn = NSButton(title: "Zoom +", target: nil, action: nil)
-        let zoomOutBtn = NSButton(title: "Zoom -", target: nil, action: nil)
-        let resetFontBtn = NSButton(title: "Aa", target: nil, action: nil)
+    @objc private func tapped(_ sender: NSButton) { handlers[sender.tag]() }
+    @objc private func menuTapped(_ sender: NSMenuItem) { handlers[sender.tag]() }
 
-        add(newBtn, gap: 10) { [weak self] in self?.onNew?() }
-        add(openBtn, gap: 6) { [weak self] in self?.onOpen?() }
-        add(saveAllBtn, gap: 6) { [weak self] in self?.onSaveAll?() }
-        add(zoomInBtn, gap: 18) { [weak self] in self?.onZoomIn?() }
-        add(zoomOutBtn, gap: 6) { [weak self] in self?.onZoomOut?() }
-        add(resetFontBtn, gap: 6) { [weak self] in self?.onResetFont?() }
-
-        wordWrapBtn.bezelStyle = .rounded; whitespaceBtn.bezelStyle = .rounded; indentGuidesBtn.bezelStyle = .rounded
-        let toggle = #selector(toggleTapped(_:))
-        wordWrapBtn.target = self; wordWrapBtn.action = toggle
-        whitespaceBtn.target = self; whitespaceBtn.action = toggle
-        indentGuidesBtn.target = self; indentGuidesBtn.action = toggle
-
-        add(wordWrapBtn, gap: 18) { [weak self] in self?.fireToggle(self!.wordWrapBtn) }
-        add(whitespaceBtn, gap: 6) { [weak self] in self?.fireToggle(self!.whitespaceBtn) }
-        add(indentGuidesBtn, gap: 6) { [weak self] in self?.fireToggle(self!.indentGuidesBtn) }
-
-        for (btn, _) in layoutSpecs { addSubview(btn) }
-    }
-
-    /// Toggle buttons act like checkmarks; the window applies the change then calls syncToggles.
-    @objc private func toggleTapped(_ sender: NSButton) {
-        actions[ObjectIdentifier(sender)]?()
+    @objc private func showMore(_ sender: NSButton) {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        for i in visibleCount..<buttons.count {
+            let item = NSMenuItem(title: buttons[i].toolTip ?? "Action",
+                                  action: #selector(menuTapped(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = i
+            item.image = buttons[i].image
+            if toggleIndices.contains(i) { item.state = buttons[i].state }
+            menu.addItem(item)
+        }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.minY - 2), in: sender)
     }
 
     private func fireToggle(_ btn: NSButton) {
@@ -86,14 +124,15 @@ final class ToolbarHeader: NSView {
     }
 
     override func layout() {
+        let available = max(0, bounds.width - 6)
+        let fullWidth = CGFloat(buttons.count) * (buttonWidth + gap) - gap
+        let overflow = available < fullWidth
+        let count = overflow ? max(0, min(buttons.count, Int((available - 56) / (buttonWidth + gap)))) : buttons.count
+        visibleCount = count
+        for (i, button) in buttons.enumerated() { button.isHidden = i >= count }
+        more.isHidden = !overflow
         super.layout()
-        var x: CGFloat = 0
-        let h: CGFloat = 26
-        for (btn, gap) in layoutSpecs {
-            btn.frame = NSRect(x: x + gap, y: (bounds.height - h) / 2, width: btn.intrinsicContentSize.width + 14, height: h)
-            x += gap + btn.frame.width
-        }
     }
 
-    var preferredHeight: CGFloat { 38 }
+    var preferredHeight: CGFloat { 34 }
 }
