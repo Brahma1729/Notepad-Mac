@@ -1,6 +1,6 @@
 import AppKit
 
-/// Notepad++-style toolbar rendered above the editor (programmatic, no nib).
+/// toolbar rendered above the editor (programmatic, no nib).
 final class ToolbarHeader: NSView {
 
     // Callbacks wired by EditorWindow.

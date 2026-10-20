@@ -10,21 +10,21 @@ enum SelfTest {
         }
 
         let utf8 = Data("héllo\n".utf8)
-        check("utf8 roundtrip", NPPEncoding.detect(utf8) == .utf8 && NPPEncoding.utf8.decode(utf8) == "héllo\n")
+        check("utf8 roundtrip", TextEncoding.detect(utf8) == .utf8 && TextEncoding.utf8.decode(utf8) == "héllo\n")
 
         let bom = Data([0xEF, 0xBB, 0xBF]) + Data("x".utf8)
-        check("utf8-bom detect", NPPEncoding.detect(bom) == .utf8BOM && NPPEncoding.utf8BOM.strippedBOM(bom).count == 1)
+        check("utf8-bom detect", TextEncoding.detect(bom) == .utf8BOM && TextEncoding.utf8BOM.strippedBOM(bom).count == 1)
 
         let u16 = "ab".data(using: .utf16LittleEndian)!
-        check("utf16le detect", NPPEncoding.detect(Data([0xFF, 0xFE]) + u16) == .utf16le
-              && NPPEncoding.utf16le.decode(NPPEncoding.utf16le.strippedBOM(Data([0xFF, 0xFE]) + u16)) == "ab")
+        check("utf16le detect", TextEncoding.detect(Data([0xFF, 0xFE]) + u16) == .utf16le
+              && TextEncoding.utf16le.decode(TextEncoding.utf16le.strippedBOM(Data([0xFF, 0xFE]) + u16)) == "ab")
 
         let be = Data([0xFE, 0xFF]) + ("ab".data(using: .utf16BigEndian)!)
-        check("utf16be detect", NPPEncoding.detect(be) == .utf16be
-              && NPPEncoding.utf16be.decode(NPPEncoding.utf16be.strippedBOM(be)) == "ab")
+        check("utf16be detect", TextEncoding.detect(be) == .utf16be
+              && TextEncoding.utf16be.decode(TextEncoding.utf16be.strippedBOM(be)) == "ab")
 
         let ansi = Data([0x48, 0xE9]) // H + é in Latin-1
-        check("ansi decode", NPPEncoding.detect(ansi) == .ansi && NPPEncoding.ansi.decode(ansi) == "H\u{E9}")
+        check("ansi decode", TextEncoding.detect(ansi) == .ansi && TextEncoding.ansi.decode(ansi) == "H\u{E9}")
 
         check("eol windows", EOLStyle.detect(in: "a\r\nb\r\nc") == .windows)
         check("eol unix", EOLStyle.detect(in: "a\nb\nc") == .unix)
@@ -34,7 +34,7 @@ enum SelfTest {
         check("normalize->crlf", EOLStyle.normalize(mixed, to: .windows) == "a\r\nb\r\nc\r\nd")
         check("normalize->lf", EOLStyle.normalize(mixed, to: .unix) == "a\nb\nc\nd")
 
-        let encoded = [UInt8](NPPEncoding.utf8BOM.encode("z"))
+        let encoded = [UInt8](TextEncoding.utf8BOM.encode("z"))
         check("bom write", Array(encoded.prefix(3)) == [0xEF, 0xBB, 0xBF])
 
         // MARK: SearchEngine — Find All line numbers across EOL styles + context preview
@@ -74,7 +74,7 @@ enum SelfTest {
             let f6 = try SearchEngine.findAll("world", in: short, options: opts)
             check("snippet short line intact", SearchEngine.contextSnippet(for: f6[0].range, in: short) == "hello world")
 
-            // Case-insensitive by default (NPP parity): every case variant of the query matches.
+            // Case-insensitive by default: every case variant of the query matches.
             var wordOpts = FindOptions()   // defaults: ignoreCase on, whole-word off
             let ciText = "a cat and a CAT cAt" as NSString
             let f7 = try SearchEngine.findAll("cat", in: ciText, options: wordOpts)

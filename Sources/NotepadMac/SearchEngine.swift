@@ -83,17 +83,17 @@ struct SearchEngine {
         return all.count
     }
 
-    /// Count every occurrence in the whole document (NPP "Find All" count).
+    /// Count every occurrence in the whole document ("Find All" count).
     static func countAll(_ query: String, in text: NSString, options: FindOptions) throws -> Int {
         guard !query.isEmpty else { return 0 }
         let regex = try matches(query, options: options)
         return regex.numberOfMatches(in: text as String, range: NSRange(location: 0, length: text.length))
     }
 
-    /// One occurrence found by Find All (NPP lists these with their line numbers).
+    /// One occurrence found by Find All (editor lists these with their line numbers).
     struct Match {
         let range: NSRange
-        let line: Int   // 1-based, like NPP's results list
+        let line: Int   // 1-based, like editor's results list
     }
 
     /// Every occurrence in document order. Line numbers are computed lazily per match.
@@ -110,7 +110,7 @@ struct SearchEngine {
     }
 
     /// 1-based line number containing a UTF-16 offset.
-    /// EOL-aware like NPP: `\r\n` counts as one break; lone `\n` and lone `\r` count too.
+    /// EOL-aware like editor: `\r\n` counts as one break; lone `\n` and lone `\r` count too.
     private static func lineNumber(of loc: Int, in text: NSString) -> Int {
         guard loc > 0 else { return 1 }
         var line = 1
@@ -128,7 +128,7 @@ struct SearchEngine {
         return line
     }
 
-    /// NPP-style preview for the results list: the match's line with a context window
+    /// preview for the results list: the match's line with a context window
     /// around it, elided (`…`) on either side when the line is long. EOL-aware.
     static func contextSnippet(for range: NSRange, in text: NSString) -> String {
         let n = text.length

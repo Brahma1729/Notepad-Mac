@@ -42,7 +42,7 @@ final class Highlighter {
         if lang.id == "python" { // triple-quoted strings
             for d in ["\"", "'"] {
                 let q = NSRegularExpression.escapedPattern(for: String(d))
-                color(storage, pattern: "[fFbBrRuUxX]{1,2}\(q)[^\\n]*?(?=\(q)|$)", role: .string)   // f"/r' prefixes (NPP-like)
+                color(storage, pattern: "[fFbBrRuUxX]{1,2}\(q)[^\\n]*?(?=\(q)|$)", role: .string)   // f"/r' prefixes ()
                 let t = NSRegularExpression.escapedPattern(for: String(repeating: d, count: 3))
                 color(storage, pattern: "\(t)[\\s\\S]*?\(t)", role: .string)
             }
