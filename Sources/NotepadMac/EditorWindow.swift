@@ -71,22 +71,38 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
         toolbar.syncToggles(wordWrap: wordWrapped, whitespace: textView.showWhitespace, indentGuides: textView.showIndentGuides)
 
         // Auto Layout (the old frame-based layout let the editor overlap the menu/toolbar).
-        for v in [menuBar, toolbar, scrollView, statusBar] {
+        // Combined header row: menu strip + quick-action toolbar side by side in one NSStackView.
+        let separator = NSBox()
+        separator.boxType = .separator
+        separator.translatesAutoresizingMaskIntoConstraints = false
+        let header = NSStackView(views: [menuBar, separator, toolbar])
+        header.orientation = .horizontal
+        header.distribution = .fill
+        header.alignment = .centerY
+        header.spacing = 8
+        // Menus keep their natural width; the toolbar absorbs extra horizontal space.
+        toolbar.setContentHuggingPriority(NSLayoutConstraint.Priority(249), for: .horizontal)
+        menuBar.setContentCompressionResistancePriority(.required, for: .horizontal)
+        header.setClippingResistancePriority(.required, for: .horizontal)
+        window.contentMinSize.width = max(window.contentMinSize.width, menuBar.intrinsicContentSize.width + 96)
+
+        for v in [header, scrollView, statusBar] {
             v.translatesAutoresizingMaskIntoConstraints = false
             container.addSubview(v)
         }
         NSLayoutConstraint.activate([
-            menuBar.topAnchor.constraint(equalTo: container.topAnchor),
-            menuBar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            menuBar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
             menuBar.heightAnchor.constraint(equalToConstant: MenuHeader.height),
-
-            toolbar.topAnchor.constraint(equalTo: menuBar.bottomAnchor),
-            toolbar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            toolbar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            separator.widthAnchor.constraint(equalToConstant: 1),
+            separator.heightAnchor.constraint(equalToConstant: 22),
+            toolbar.widthAnchor.constraint(greaterThanOrEqualToConstant: 62),
             toolbar.heightAnchor.constraint(equalToConstant: toolbar.preferredHeight),
 
-            scrollView.topAnchor.constraint(equalTo: toolbar.bottomAnchor),
+            header.topAnchor.constraint(equalTo: container.topAnchor),
+            header.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            header.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            header.heightAnchor.constraint(equalToConstant: max(MenuHeader.height, toolbar.preferredHeight)),
+
+            scrollView.topAnchor.constraint(equalTo: header.bottomAnchor),
             scrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: statusBar.topAnchor),
@@ -278,13 +294,30 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
 
     @objc func toggleWordWrap(_ sender: Any? = nil) {
         wordWrapped.toggle()
-        textView.isHorizontallyResizable = !wordWrapped
-        textView.maxSize = NSSize(width: wordWrapped ? CGFloat.greatestFiniteMagnitude : 1_000_000,
-                                  height: CGFloat.greatestFiniteMagnitude)
-        scrollView.hasHorizontalScroller = !wordWrapped
+        applyWordWrap()
         if let item = sender as? NSMenuItem { item.state = wordWrapped ? .on : .off } else { syncWordWrapMenuItem() }
         toolbar.syncToggles(wordWrap: wordWrapped, whitespace: textView.showWhitespace, indentGuides: textView.showIndentGuides)
         menuBar.syncViewStates(wordWrap: wordWrapped, whitespace: textView.showWhitespace, indentGuides: textView.showIndentGuides)
+    }
+
+    /// NPP-style soft wrap: ON wraps at the visible width; OFF lets lines run full-width with a horizontal scroller.
+    private func applyWordWrap() {
+        guard let container = textView.textContainer else { return }
+        if wordWrapped {
+            container.widthTracksTextView = true
+            container.size = NSSize(width: max(scrollView.contentSize.width, 1), height: CGFloat.greatestFiniteMagnitude)
+            textView.isHorizontallyResizable = false
+            textView.autoresizingMask = [.width]
+            textView.minSize = .zero
+        } else {
+            container.widthTracksTextView = false
+            container.size = NSSize(width: 1_000_000, height: CGFloat.greatestFiniteMagnitude)
+            textView.isHorizontallyResizable = true
+            textView.autoresizingMask = []
+            textView.minSize = NSSize(width: max(scrollView.contentSize.width, 1), height: 0)
+        }
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        scrollView.hasHorizontalScroller = !wordWrapped
     }
 
     /// Keeps the View ▸ Word Wrap checkmark in sync when toggled from the toolbar.
