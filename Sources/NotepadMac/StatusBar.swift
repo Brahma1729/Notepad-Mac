@@ -1,8 +1,8 @@
 import AppKit
 
-/// Bottom status strip (Notepad++-like): Ln/Col/Sel, percent scrolled, EOL, encoding, language.
+/// Bottom status strip (): Ln/Col/Sel, percent scrolled, EOL, encoding, language.
 final class StatusBar: NSView {
-    static let height: CGFloat = 20   // fixed NPP-style strip height (used by the Auto Layout in EditorWindow)
+    static let height: CGFloat = 20   // fixed  strip height (used by the Auto Layout in EditorWindow)
     private let lnLabel = NSTextField(labelWithString: "Ln 1")
     private let colLabel = NSTextField(labelWithString: "Col 1")
     private let selLabel = NSTextField(labelWithString: "")

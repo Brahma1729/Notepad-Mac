@@ -1,8 +1,8 @@
 import Foundation
 
-// MARK: - Encoding (NPP-compatible names)
+// MARK: - Encoding
 
-enum NPPEncoding: String, CaseIterable {
+enum TextEncoding: String, CaseIterable {
     case utf8 = "UTF-8"
     case utf8BOM = "UTF-8-BOM"
     case utf16le = "UTF-16 LE"
@@ -35,7 +35,7 @@ enum NPPEncoding: String, CaseIterable {
     }
 
     /// Detect encoding from raw bytes (BOMs first, then UTF-8 validity).
-    static func detect(_ data: Data) -> NPPEncoding {
+    static func detect(_ data: Data) -> TextEncoding {
         let b = [UInt8](data.prefix(4))
         if data.count >= 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF { return .utf8BOM }
         if data.count >= 2 && b[0] == 0xFF && b[1] == 0xFE { return .utf16le }
@@ -59,7 +59,7 @@ enum NPPEncoding: String, CaseIterable {
         return data
     }
 
-    static func detectAndDecode(_ data: Data) -> (text: String, encoding: NPPEncoding)? {
+    static func detectAndDecode(_ data: Data) -> (text: String, encoding: TextEncoding)? {
         let enc = detect(data)
         guard let text = enc.decode(enc.strippedBOM(data)) else { return nil }
         return (text, enc)
@@ -105,7 +105,7 @@ enum EOLStyle: String, CaseIterable {
     }
 }
 
-// MARK: - Latin-1 bridge (ANSI approximation, same as NPP on this platform)
+// MARK: - Latin-1 bridge (ANSI approximation)
 
 extension String {
     init?(bytes: Data, encodingLatin1: Bool) {

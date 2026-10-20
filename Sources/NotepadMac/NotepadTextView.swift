@@ -1,10 +1,10 @@
 import AppKit
 
-/// NSTextView subclass that draws Notepad++-style overlays:
+/// NSTextView subclass that draws  overlays:
 /// whitespace markers (dots) and indent guides (vertical rules per leading space).
 final class NotepadTextView: NSTextView {
 
-    /// NPP defaults: whitespace dots + indent guides both visible (toggle from toolbar or View menu).
+    /// Default view options: whitespace dots + indent guides both visible (toggle from toolbar or View menu).
     var showWhitespace = true   { didSet { if oldValue != showWhitespace { needsDisplay = true } } }
     var showIndentGuides = true { didSet { if oldValue != showIndentGuides { needsDisplay = true } } }
 
@@ -29,7 +29,7 @@ final class NotepadTextView: NSTextView {
         for (range, fragRect) in lines where fragRect.intersects(dirtyRect) {
             let line = nsText.substring(with: range) as NSString
 
-            // Indent guides: one vertical rule per leading space/tab (NPP-style).
+            // Indent guides: one vertical rule per leading space/tab ().
             if showIndentGuides {
                 var indent = 0
                 while indent < line.length,

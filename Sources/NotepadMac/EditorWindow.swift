@@ -16,7 +16,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
     private var wordWrapped = true
     private var programmaticEdit = false
 
-    /// NPP-style default window size (1024x768 content).
+    /// default window size (1024x768 content).
     init(document: EditorDocument) {
         self.doc = document
         super.init(window: NSWindow(contentRect: NSRect(x: 300, y: 250, width: 1024, height: 768),
@@ -51,7 +51,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
         tv.isHorizontallyResizable = false
         tv.autoresizingMask = [.width]
         tv.textContainerInset = NSSize(width: 4, height: 8)
-        tv.font = NSFont.userFixedPitchFont(ofSize: 13)   // NPP-like monospace default; Highlighter preserves it per-attribute
+        tv.font = NSFont.userFixedPitchFont(ofSize: 13)   // monospace default; Highlighter preserves it per-attribute
         tv.delegate = self
         return tv
     }
@@ -142,7 +142,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
         let work = DispatchWorkItem { [weak self] in self?.applyHighlightNow() }
         highlightWork?.cancel()
         highlightWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)   // debounce bursts of typing (NPP-like responsiveness)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)   // debounce bursts of typing ( responsiveness)
     }
 
     private func applyHighlightNow() {
@@ -189,7 +189,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
         statusBar.update(line: line, column: col, selectionLength: range.length, percentScroll: scrollPercent())
     }
 
-    /// 0...1 position of the viewport within the document (NPP status-bar percentage).
+    /// 0...1 position of the viewport within the document (status-bar percentage).
     private func scrollPercent() -> CGFloat {
         guard let clip = textView.enclosingScrollView?.contentView else { return 0 }
         let docHeight = textView.layoutManager?.usedRect(for: textView.textContainer!).height ?? 0
@@ -207,26 +207,26 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
 
     func textViewDidChangeSelection(_ notification: Notification) { refreshCaretStatus() }
 
-    // MARK: - Search integration (NPP: Find = Cmd+F, Replace = Cmd+H)
+    // MARK: - Search integration (Find = Cmd+F, Replace = Cmd+H)
 
     @objc func find(_ sender: Any?) { presentSearchPanel() }
 
-    /// NPP uses one unified Find/Replace panel, so both menu items open the same view.
+    /// Both commands use one unified Find/Replace panel, so both menu items open the same view.
     @objc func replace(_ sender: Any?) { presentSearchPanel() }
 
     private func presentSearchPanel() {
         SearchPanel.shared.present(over: textView, document: doc)
     }
 
-    // MARK: - Save (NPP: keep the same encoding/EOL; BOM only if one was there)
+    // MARK: - Save (keep the same encoding/EOL; BOM only if one was there)
 
     @objc func saveDocument(_ sender: Any?) {
-        guard doc.isDirty else { NSSound.beep(); return }   // NPP disables Save when clean
+        guard doc.isDirty else { NSSound.beep(); return }   // No write is needed for a clean document
         do { try writeAndSave() } catch { NSSound.beep() }
     }
 
     @objc func saveDocumentAs(_ sender: Any?) {
-        let panel = NSSavePanel()   // any file type allowed (NPP accepts everything)
+        let panel = NSSavePanel()   // any file type allowed
         panel.nameFieldStringValue = doc.displayName.hasSuffix(".") ? doc.displayName : doc.displayName + ".txt"
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
@@ -268,10 +268,10 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
         default: doc.encoding = .ansi
         }
         updateStatusBarMeta()
-        markEncodingCheckmarks(name)   // checkmark follows the active encoding (NPP behavior)
+        markEncodingCheckmarks(name)   // checkmark follows the active encoding
     }
 
-    /// Menu-item name for the current document encoding (`NPPEncoding.rawValue` is "ANSI (Latin-1)", but menus say "ANSI").
+    /// Menu-item name for the current document encoding (`TextEncoding.rawValue` is "ANSI (Latin-1)", but menus say "ANSI").
     private var encodingMenuName: String {
         switch doc.encoding {
         case .utf8: return "UTF-8"
@@ -293,7 +293,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
         }
     }
 
-    // MARK: - Word wrap (NPP View menu)
+    // MARK: - Word wrap (View menu)
 
     @objc func toggleWordWrap(_ sender: Any? = nil) {
         wordWrapped.toggle()
@@ -303,7 +303,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
         menuBar.syncViewStates(wordWrap: wordWrapped, whitespace: textView.showWhitespace, indentGuides: textView.showIndentGuides)
     }
 
-    /// NPP-style soft wrap: ON wraps at the visible width; OFF lets lines run full-width with a horizontal scroller.
+    /// soft wrap: ON wraps at the visible width; OFF lets lines run full-width with a horizontal scroller.
     private func applyWordWrap() {
         guard let container = textView.textContainer else { return }
         if wordWrapped {
@@ -334,9 +334,9 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
         }
     }
 
-    // MARK: - Toolbar actions (NPP-style quick buttons)
+    // MARK: - Toolbar actions ( quick buttons)
 
-    /// NPP "Save All": writes every dirty document, keeping each one's own encoding/EOL.
+    /// "Save All": writes every dirty document, keeping each one's own encoding/EOL.
     @objc func saveAll(_ sender: Any?) {
         for controller in NSApp.windows.compactMap({ $0.windowController as? EditorWindowController }) where controller.doc.isDirty {
             do { try controller.writeAndSave() } catch { NSSound.beep() }
@@ -379,7 +379,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate {
         toolbar.onToggleIndentGuides = { [weak self] _ in self?.toggleIndentGuides(nil) }
     }
 
-    // MARK: - Close (NPP: prompt to save when dirty)
+    // MARK: - Close (prompt to save when dirty)
 
     @objc func closeDocument(_ sender: Any?) {
         guard confirmSaveIfDirty() else { return }

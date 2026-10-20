@@ -1,6 +1,6 @@
 import AppKit
 
-/// Application delegate: NPP-style menu bar, window registry, New/Open actions.
+/// Application delegate:  menu bar, window registry, New/Open actions.
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Strong references to live windows (NSApp does not retain window controllers).
@@ -8,11 +8,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMainMenu()
-        newDocument(nil)                       // NPP starts with one blank tab
+        newDocument(nil)                       // Start with one blank document
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    /// Closing the last window quits (like NPP closing its last tab).
+    /// Closing the last window quits.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     // MARK: - Window registry
@@ -61,7 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let data = try Data(contentsOf: url)
                 let doc = EditorDocument()
                 if doc.load(data: data, url: url) {
-                    doc.languageID = Languages.forPath(url.path).id   // extension-based detection (NPP behavior)
+                    doc.languageID = Languages.forPath(url.path).id   // extension-based detection
                     present(doc, cascadeIndex: controllers.count)
                 } else {
                     NSSound.beep()
@@ -86,27 +86,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // MARK: - Menu bar (NPP layout + shortcuts)
+    // MARK: - Menu bar (layout + shortcuts)
 
     private func buildMainMenu() {
         let mainMenu = NSMenu()
         NSApp.mainMenu = mainMenu
 
-        // --- App menu (first slot; NPP has no app menu, but macOS requires one) ---
+        // --- App menu (first slot, as required by macOS) ---
         let appItem = NSMenuItem(); mainMenu.addItem(appItem)
-        let appMenu = NSMenu(title: "Notepad++")
+        let appMenu = NSMenu(title: "NotepadMac")
         appItem.submenu = appMenu
-        add(appMenu, "About Notepad++", nil, "")
+        add(appMenu, "About NotepadMac", nil, "")
         appMenu.addItem(.separator())
-        add(appMenu, "Hide Notepad++", #selector(NSApplication.hide(_:)), "h")
+        add(appMenu, "Hide NotepadMac", #selector(NSApplication.hide(_:)), "h")
         let hideOthers = NSMenuItem(title: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
         hideOthers.keyEquivalentModifierMask = [.command, .option]
         appMenu.addItem(hideOthers)
         add(appMenu, "Show All", #selector(NSApplication.unhideAllApplications(_:)), "")
         appMenu.addItem(.separator())
-        add(appMenu, "Quit Notepad++", #selector(NSApplication.terminate(_:)), "q")
+        add(appMenu, "Quit NotepadMac", #selector(NSApplication.terminate(_:)), "q")
 
-        // --- File (NPP: New / Open / Save / Save As... + Close) ---
+        // --- File (New / Open / Save / Save As... + Close) ---
         let fileItem = NSMenuItem(); mainMenu.addItem(fileItem)
         let fileMenu = NSMenu(title: "File"); fileItem.submenu = fileMenu
         add(fileMenu, "New", #selector(newDocument(_:)), "n")
@@ -117,7 +117,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         add(fileMenu, "Save As...", #selector(EditorWindowController.saveDocumentAs(_:)), "S")
         add(fileMenu, "Save All", #selector(EditorWindowController.saveAll(_:)), "")
 
-        // --- Edit (NPP: Undo / Redo / Cut-Copy-Paste / Select All) ---
+        // --- Edit (Undo / Redo / Cut-Copy-Paste / Select All) ---
         let editItem = NSMenuItem(); mainMenu.addItem(editItem)
         let editMenu = NSMenu(title: "Edit"); editItem.submenu = editMenu
         add(editMenu, "Undo", Selector(("undo:")), "z")   // routed via responder chain to NSTextView's undo manager
@@ -130,13 +130,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         editMenu.addItem(.separator())
         add(editMenu, "Select All", #selector(NSText.selectAll(_:)), "a")
 
-        // --- Search (NPP: Find / Replace / Go To Line) ---
+        // --- Search (Find / Replace / Go To Line) ---
         let searchItem = NSMenuItem(); mainMenu.addItem(searchItem)
         let searchMenu = NSMenu(title: "Search"); searchItem.submenu = searchMenu
         add(searchMenu, "Find...", #selector(EditorWindowController.find(_:)), "f")
         add(searchMenu, "Replace...", #selector(EditorWindowController.replace(_:)), "h")
 
-        // --- View (NPP: Word Wrap / Auto-Complete) ---
+        // --- View (Word Wrap / Auto-Complete) ---
         let viewItem = NSMenuItem(); mainMenu.addItem(viewItem)
         let viewMenu = NSMenu(title: "View"); viewItem.submenu = viewMenu
         let wrap = NSMenuItem(title: "Word Wrap", action: #selector(EditorWindowController.toggleWordWrap(_:)), keyEquivalent: "")
@@ -149,7 +149,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ig.target = nil; ig.state = .on
         viewMenu.addItem(ig)
 
-        // --- Language (NPP: Language menu — Core / Web groups) ---
+        // --- Language (Language menu — Core / Web groups) ---
         let langItem = NSMenuItem(); mainMenu.addItem(langItem)
         let langMenu = NSMenu(title: "Language"); langItem.submenu = langMenu
         var index = 0
@@ -164,7 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             index += 1
         }
 
-        // --- Window (NPP: Close All / Move to Top ...) + Help ---
+        // --- Window (Close All / Move to Top ...) + Help ---
         let windowItem = NSMenuItem(); mainMenu.addItem(windowItem)
         let windowMenu = NSMenu(title: "Window"); windowItem.submenu = windowMenu
         add(windowMenu, "Close All", #selector(EditorWindowController.closeAllDocuments(_:)), "")
@@ -172,10 +172,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let helpItem = NSMenuItem(); mainMenu.addItem(helpItem)
         let helpMenu = NSMenu(title: "Help"); helpItem.submenu = helpMenu
-        add(helpMenu, "Notepad++ Help", #selector(NSApplication.orderFrontStandardAboutPanel(_:)), "")
+        add(helpMenu, "NotepadMac Help", #selector(NSApplication.orderFrontStandardAboutPanel(_:)), "")
         NSApp.helpMenu = helpMenu
 
-        // --- Status menu (NPP's status bar: Encoding / EOL / Language) ---
+        // --- Status menu (status bar: Encoding / EOL / Language) ---
         let statusItem = NSMenuItem(); mainMenu.addItem(statusItem)
         let statusMenu = NSMenu(title: "Status"); statusItem.submenu = statusMenu
         langMenu.title = "Language"   // keep group title in sync (no-op guard)

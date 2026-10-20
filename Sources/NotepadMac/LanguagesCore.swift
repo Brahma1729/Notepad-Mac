@@ -24,7 +24,7 @@ extension Set where Element == String {
 enum Languages {
     static let all: [LanguageDef] = core + web
 
-    /// NPP Language-menu structure: Core / Web submenus.
+    /// Language-menu structure: Core / Web submenus.
     static var groups: [(name: String, languages: [LanguageDef])] { [("Core", core), ("Web", web)] }
 
     static var plain: LanguageDef {
@@ -38,7 +38,7 @@ enum Languages {
         return all.first { $0.extensions.contains(ext) } ?? plain
     }
 
-    // MARK: core languages (menu order = Notepad++-like 1–6)
+    // MARK: core languages (menu order =  1–6)
 
     static var clike: LanguageDef {
         var l = LanguageDef(id: "c", name: "C / C++ / C# / Java", extensions: ["c","cc","cpp","cxx","h","hh","hpp","cs","java","m","mm"])

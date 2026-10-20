@@ -1,6 +1,6 @@
 import AppKit
 
-/// Notepad++-style Find / Replace panel (single reusable instance, like NPP).
+/// Find / Replace panel (single reusable instance, like editor).
 final class SearchPanel: NSPanel {
     static let shared = SearchPanel()
 
@@ -11,7 +11,7 @@ final class SearchPanel: NSPanel {
     private let regexCheckbox = NSButton(checkboxWithTitle: "Regex", target: nil, action: nil)
     private var statusLabel: NSTextField!
 
-    // MARK: Find All results list (NPP "Find all" — click a row to jump there)
+    // MARK: Find All results list ("Find all" — click a row to jump there)
     private let resultsTable = NSTableView()
     private lazy var resultsScroll: NSScrollView = {
         let s = NSScrollView()
@@ -122,7 +122,7 @@ final class SearchPanel: NSPanel {
         column.title = "Match"
         column.width = 420
         resultsTable.addTableColumn(column)
-        resultsTable.headerView = nil          // NPP's list has no header
+        resultsTable.headerView = nil          // The results list has no header
         resultsTable.rowSizeStyle = .default
         resultsTable.usesAutomaticRowHeights = false
         resultsTable.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
@@ -144,7 +144,7 @@ final class SearchPanel: NSPanel {
         ])
     }
 
-    /// Grow/shrink the panel for the results list, keeping its top edge fixed (like NPP).
+    /// Grow/shrink the panel for the results list, keeping its top edge fixed.
     private func setResultsExpanded(_ expand: Bool) {
         let delta: CGFloat = expand ? resultsExtraHeight : 0
         guard delta != expandedDelta else { return }
@@ -176,7 +176,7 @@ final class SearchPanel: NSPanel {
             setFrameOrigin(NSPoint(x: window.frame.minX + 60, y: window.frame.maxY - 170))
         }
         makeKeyAndOrderFront(nil)
-        // Pre-fill with current selection (NPP behavior).
+        // Pre-fill with current selection.
         let sel = textView.selectedRange()
         if sel.length > 0 { queryField.stringValue = (textView.string as NSString).substring(with: sel) }
         selectAllInQuery()
@@ -200,12 +200,12 @@ final class SearchPanel: NSPanel {
     @objc func findNext() { _ = perform(.forward) }
     @objc func findPrevious() { _ = perform(.backward) }
 
-    /// NPP "Find All": list every occurrence with its line number; click a row to jump there.
+    /// "Find All": list every occurrence with its line number; click a row to jump there.
     @objc func findAllAction() {
         guard let tv = textView, !queryField.stringValue.isEmpty else { return }
         do {
             let all = try SearchEngine.findAll(queryField.stringValue, in: tv.string as NSString, options: options)
-            matches = all   // keep every hit — no cap (NPP lists them all); rowTexts is precomputed so rows stay cheap
+            matches = all   // keep every hit — no cap; rowTexts is precomputed so rows stay cheap
             rowTexts = matches.map { "L\($0.line): \(Self.lineSnippet(for: $0.range, in: tv.string as NSString))" }
             resultsTable.reloadData()
             setResultsExpanded(true)
@@ -215,18 +215,18 @@ final class SearchPanel: NSPanel {
         }
     }
 
-    /// Context around the match (NPP-style). Long lines are shown as a window centered on the hit, so one giant line can't produce an unreadable row.
+    /// Context around the match (). Long lines are shown as a window centered on the hit, so one giant line can't produce an unreadable row.
     private static func lineSnippet(for range: NSRange, in text: NSString) -> String {
         let n = text.length
         guard n > 0 else { return "" }
 
-        // Line bounds — \n, \r\n and a lone \r all count as EOL (NPP/Notepad conventions).
+        // Line bounds — \n, \r\n and a lone \r all count as EOL.
         var start = min(range.location, n - 1)
         while start > 0 { let c = text.character(at: start - 1); if c == 10 || c == 13 { break }; start -= 1 }
         var end = min(NSMaxRange(range), n)
         while end < n { let c = text.character(at: end); if c == 10 || c == 13 { break }; end += 1 }
 
-        let maxLen = 80   // keep table rows readable (NPP-style)
+        let maxLen = 80   // keep table rows readable ()
         var lo = start, hi = end
         if hi - lo > maxLen {
             // Window covering the match; prefer keeping the hit visible.
@@ -271,7 +271,7 @@ final class SearchPanel: NSPanel {
             try SearchEngine.replaceOne(queryField.stringValue, replacement: replaceField.stringValue, in: tv.textStorage!, options: options, at: tv.selectedRange())
             document?.markDirty()
             clearResults()   // stored ranges are now stale after the edit
-            _ = perform(.forward) // continue searching after replace (NPP behavior)
+            _ = perform(.forward) // continue searching after replace
         } catch { statusLabel.stringValue = error.localizedDescription; NSSound.beep() }
     }
 
@@ -287,11 +287,11 @@ final class SearchPanel: NSPanel {
 
     @objc func closePanel() { orderOut(nil) }
 
-    /// Called from EditorWindow whenever document text changes — stored Find All locations are now stale, so drop them (NPP-style).
+    /// Called from EditorWindow whenever document text changes — stored Find All locations are now stale, so drop them ().
     func invalidateResults() { clearResults() }
 }
 
-// MARK: - Find All results list (NPP-style table)
+// MARK: - Find All results list ( table)
 
 extension SearchPanel: NSTableViewDataSource, NSTableViewDelegate {
     func numberOfRows(in tableView: NSTableView) -> Int { rowTexts.count }
@@ -315,7 +315,7 @@ extension SearchPanel: NSTableViewDataSource, NSTableViewDelegate {
         tv.window?.makeFirstResponder(tv)
     }
 
-    /// Clicking a result row jumps the editor to that occurrence (NPP behavior).
+    /// Clicking a result row jumps the editor to that occurrence.
     func tableViewSelectionDidChange(_ notification: Notification) {
         let row = resultsTable.selectedRow
         guard row >= 0, row < matches.count, let tv = textView else { return }

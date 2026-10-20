@@ -1,6 +1,6 @@
 import AppKit
 
-/// In-window NPP-style menu strip: a horizontal row of clickable menus
+/// In-window  menu strip: a horizontal row of clickable menus
 /// (File / Edit / Search / View / Language / Encoding / Window) that mirrors the app's
 /// main-menu bar. Each button pops up a real `NSMenu`; items use type-checked
 /// selectors and route through the responder chain to `EditorWindowController`
@@ -61,7 +61,7 @@ final class MenuHeader: NSView {
 
         for spec in specs {
             let button = NSButton(title: " \(spec.title) ▾", target: self, action: #selector(popUpMenu(_:)))
-            button.bezelStyle = .regularSquare          // subtle bezel + press highlight (NPP-like affordance)
+            button.bezelStyle = .regularSquare          // subtle bezel + press highlight ( affordance)
             button.font = NSFont.systemFont(ofSize: 12)
             button.setButtonType(.onOff)               // stays highlighted while its menu is open
             button.setContentHuggingPriority(.required, for: .horizontal)
@@ -142,7 +142,7 @@ final class MenuHeader: NSView {
 
     private func searchMenu() -> NSMenu {
         let menu = NSMenu(title: "Search")
-        // Find and Replace share one Notepad++-style panel (same as the app menu).
+        // Find and Replace share one  panel (same as the app menu).
         menu.addItem(makeItem("Find…", #selector(EditorWindowController.find(_:)), "f"))
         menu.addItem(makeItem("Replace…", #selector(EditorWindowController.replace(_:)), "h"))
         return menu
